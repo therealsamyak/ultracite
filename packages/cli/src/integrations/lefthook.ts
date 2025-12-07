@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { addDevDependency, dlxCommand, type PackageManagerName } from "nypm";
-import { exists, isMonorepo } from "../utils";
+import { exists, isMonorepo, updatePackageJson } from "../utils";
 
 const PRE_COMMIT_JOBS_REGEX = /(pre-commit:\s*\n\s*jobs:\s*\n)/;
 const PRE_COMMIT_REGEX = /(pre-commit:\s*\n)/;
@@ -38,12 +38,26 @@ export const lefthook = {
       workspace: await isMonorepo(),
     });
 
+    // Add prepare script to package.json to ensure lefthook is initialized
+    await updatePackageJson({
+      scripts: {
+        prepare: "lefthook install",
+      },
+    });
+  },
+  init: (packageManager: PackageManagerName) => {
+    // Initialize lefthook - this sets up git hooks infrastructure
     const installCommand = dlxCommand(packageManager, "lefthook", {
       args: ["install"],
       short: packageManager === "npm",
     });
 
-    execSync(installCommand);
+    try {
+      execSync(installCommand, { stdio: "inherit" });
+    } catch (_error) {
+      // If install fails, it might be because it's already initialized
+      // Continue anyway as we'll create the config file next
+    }
   },
   create: async (packageManager: PackageManagerName) => {
     const config = createLefthookConfig(packageManager);

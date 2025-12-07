@@ -264,8 +264,14 @@ export const initializeLefthook = async (
   } else {
     await updatePackageJson({
       devDependencies: { lefthook: "latest" },
+      scripts: { prepare: "lefthook install" },
     });
   }
+
+  if (!quiet) {
+    s.message("Initializing lefthook...");
+  }
+  lefthook.init(packageManager);
 
   if (await lefthook.exists()) {
     if (!quiet) {
@@ -393,10 +399,7 @@ export const upsertHooks = async (
   }
 };
 
-export const removePrettier = async (
-  pm: PackageManagerName,
-  quiet = false
-) => {
+export const removePrettier = async (pm: PackageManagerName, quiet = false) => {
   const s = spinner();
 
   if (!quiet) {
@@ -430,10 +433,7 @@ export const removePrettier = async (
   }
 };
 
-export const removeEsLint = async (
-  pm: PackageManagerName,
-  quiet = false
-) => {
+export const removeEsLint = async (pm: PackageManagerName, quiet = false) => {
   const s = spinner();
 
   if (!quiet) {

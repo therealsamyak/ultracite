@@ -8,7 +8,7 @@ mock.module("node:child_process", () => ({
 
 mock.module("node:fs/promises", () => ({
   access: mock(() => Promise.reject(new Error("ENOENT"))),
-  readFile: mock(() => Promise.resolve("")),
+  readFile: mock(() => Promise.resolve("{}")),
   writeFile: mock(() => Promise.resolve()),
 }));
 
@@ -63,6 +63,12 @@ describe("lefthook", () => {
         execSync: mockExecSync,
       }));
 
+      mock.module("node:fs/promises", () => ({
+        access: mock(() => Promise.reject(new Error("ENOENT"))),
+        readFile: mock(() => Promise.resolve("{}")),
+        writeFile: mock(() => Promise.resolve()),
+      }));
+
       mock.module("nypm", () => ({
         addDevDependency: mockAddDep,
         dlxCommand: mock((pm: string, name: string) => {
@@ -80,7 +86,35 @@ describe("lefthook", () => {
       expect(mockAddDep).toHaveBeenCalledWith("lefthook", expect.any(Object));
     });
 
-    test("runs lefthook install command", async () => {
+    test("adds prepare script to package.json", async () => {
+      const mockWriteFile = mock(() => Promise.resolve());
+      mock.module("node:fs/promises", () => ({
+        access: mock(() => Promise.reject(new Error("ENOENT"))),
+        readFile: mock(() => Promise.resolve("{}")),
+        writeFile: mockWriteFile,
+      }));
+
+      mock.module("nypm", () => ({
+        addDevDependency: mock(() => Promise.resolve()),
+        dlxCommand: mock((pm: string, name: string) => {
+          if (name === "lefthook") {
+            return "npx lefthook install";
+          }
+          return "npx ultracite fix";
+        }),
+        detectPackageManager: mock(() => Promise.resolve({ name: "npm" })),
+        removeDependency: mock(() => Promise.resolve()),
+      }));
+
+      await lefthook.install("npm");
+
+      expect(mockWriteFile).toHaveBeenCalled();
+      const writeCall = mockWriteFile.mock.calls[0];
+      expect(writeCall[0]).toBe("package.json");
+      expect(writeCall[1]).toContain('"prepare": "lefthook install"');
+    });
+
+    test("runs lefthook install command via init", async () => {
       const mockExecSync = mock(() => "");
       mock.module("node:child_process", () => ({
         spawnSync: mock(() => ({ status: 0 })),
@@ -99,7 +133,7 @@ describe("lefthook", () => {
         removeDependency: mock(() => Promise.resolve()),
       }));
 
-      await lefthook.install("npm");
+      lefthook.init("npm");
 
       expect(mockExecSync).toHaveBeenCalled();
     });
